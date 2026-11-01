@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 from torch import nn
+import math
+import torch
+import torch.nn.functional as F
 
 @dataclass
 class Config :
@@ -8,6 +11,43 @@ class Config :
     n_head = 12 # Number of attention heads in multi-head attention.
     n_layer = 12 # Number of transformer layers.
     n_embd = 756 # Embedding size.
+
+
+class CausalSelfAttention(nn.Module):
+    bias: torch.Tensor
+
+    def __init__(self, config : Config) -> None:
+        super().__init__()
+
+        self.q_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.k_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.v_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.c_proj = nn.Linear(config.n_embd, config.n_embd)
+
+        self.register_buffer("bias",
+            torch.tril(
+                torch.ones(config.block_size, config.block_size).view(
+                1, config.block_size, config.block_size
+                )
+            )
+        )
+
+
+    def forward(self, x):
+        B, T, E = x.size()
+
+        Q = self.q_proj(x)
+        K = self.k_proj(x)
+        V = self.v_proj(x)
+
+        A = (Q @ K.T) * (1 / math.sqrt(K.size(-1)))
+        A = A.masked_fill(self.bias[:, :T, :T] == 0, float('-inf'))
+        A = F.softmax(A, dim=-1)
+
+        y = A @ V
+        y = self.c_proj(y)
+        return y
+
 
 class MLP(nn.Module):
 
