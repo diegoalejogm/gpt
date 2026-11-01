@@ -10,7 +10,7 @@ class Config :
     block_size = 1024 # Context size.
     n_head = 12 # Number of attention heads in multi-head attention.
     n_layer = 12 # Number of transformer layers.
-    n_embd = 756 # Embedding size.
+    n_embd = 768 # Embedding size.
 
 
 class CausalSelfAttention(nn.Module):
@@ -36,18 +36,17 @@ class CausalSelfAttention(nn.Module):
     def forward(self, x):
         B, T, E = x.size()
 
-        Q = self.q_proj(x)
-        K = self.k_proj(x)
-        V = self.v_proj(x)
+        Q = self.q_proj(x) # [B,T,E]
+        K = self.k_proj(x) # [B,T,E]
+        V = self.v_proj(x) # [B,T,E]
 
-        A = (Q @ K.T) * (1 / math.sqrt(K.size(-1)))
+        A = (Q @ K.transpose(-2, -1)) * (1 / math.sqrt(K.size(-1)))
         A = A.masked_fill(self.bias[:, :T, :T] == 0, float('-inf'))
         A = F.softmax(A, dim=-1)
 
         y = A @ V
         y = self.c_proj(y)
         return y
-
 
 class MLP(nn.Module):
 
