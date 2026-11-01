@@ -19,6 +19,8 @@ class CausalSelfAttention(nn.Module):
     def __init__(self, config : Config) -> None:
         super().__init__()
 
+        self.n_head = config.n_head
+
         self.q_proj = nn.Linear(config.n_embd, config.n_embd)
         self.k_proj = nn.Linear(config.n_embd, config.n_embd)
         self.v_proj = nn.Linear(config.n_embd, config.n_embd)
@@ -34,17 +36,24 @@ class CausalSelfAttention(nn.Module):
 
 
     def forward(self, x):
-        B, T, E = x.size()
+        B, T, E = x.size() # Batch, Tokens, Embeddings
 
         Q = self.q_proj(x) # [B,T,E]
+        Q = Q.view(B, T, self.n_head, E // self.n_head) # [B,T, nh, e]
+        Q = Q.transpose(1, 2) # [B,nh,T,e]
         K = self.k_proj(x) # [B,T,E]
+        K = K.view(B, T, self.n_head, E // self.n_head) # [B,T, nh, e]
+        K = K.transpose(1,2) # [B, nh, T, e]
         V = self.v_proj(x) # [B,T,E]
+        V = V.view(B, T, self.n_head, E // self.n_head) # [B,T, nh, e]
+        V = V.transpose(1,2) # [B, nh, T, e]
 
         A = (Q @ K.transpose(-2, -1)) * (1 / math.sqrt(K.size(-1)))
         A = A.masked_fill(self.bias[:, :T, :T] == 0, float('-inf'))
-        A = F.softmax(A, dim=-1)
+        A = F.softmax(A, dim=-1) # [B, nh, T, T]
 
-        y = A @ V
+        y = A @ V # [B, nh, T, e]
+        y = y.transpose(1,2).contiguous().view(B,T,E) # [B, T, E]
         y = self.c_proj(y)
         return y
 
@@ -91,4 +100,5 @@ class GPT(nn.Module):
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
 
-print (GPT(Config()))
+mock_tensor = torch.randn([1, Config().n_head, Config().n_embd])
+print(CausalSelfAttention(Config())(mock_tensor).shape)
