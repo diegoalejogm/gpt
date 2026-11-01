@@ -20,10 +20,9 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
 
         self.n_head = config.n_head
+        self.n_embd = config.n_embd
 
-        self.q_proj = nn.Linear(config.n_embd, config.n_embd)
-        self.k_proj = nn.Linear(config.n_embd, config.n_embd)
-        self.v_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
 
         self.register_buffer("bias",
@@ -38,15 +37,8 @@ class CausalSelfAttention(nn.Module):
     def forward(self, x):
         B, T, E = x.size() # Batch, Tokens, Embeddings
 
-        Q = self.q_proj(x) # [B,T,E]
-        Q = Q.view(B, T, self.n_head, E // self.n_head) # [B,T, nh, e]
-        Q = Q.transpose(1, 2) # [B,nh,T,e]
-        K = self.k_proj(x) # [B,T,E]
-        K = K.view(B, T, self.n_head, E // self.n_head) # [B,T, nh, e]
-        K = K.transpose(1,2) # [B, nh, T, e]
-        V = self.v_proj(x) # [B,T,E]
-        V = V.view(B, T, self.n_head, E // self.n_head) # [B,T, nh, e]
-        V = V.transpose(1,2) # [B, nh, T, e]
+        qkv = self.c_attn(x) # [B, T, 3E]
+        Q, K, V = qkv.split(self.n_embd, dim=-1) # [B, T, E] each
 
         A = (Q @ K.transpose(-2, -1)) * (1 / math.sqrt(K.size(-1)))
         A = A.masked_fill(self.bias[:, :T, :T] == 0, float('-inf'))
