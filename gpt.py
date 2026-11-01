@@ -92,5 +92,5 @@ class GPT(nn.Module):
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
 
-mock_tensor = torch.randn([1, Config().n_head, Config().n_embd])
+mock_tensor = torch.randn([4, Config().block_size, Config().n_embd])
 print(CausalSelfAttention(Config())(mock_tensor).shape)
