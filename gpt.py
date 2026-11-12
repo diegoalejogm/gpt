@@ -161,3 +161,49 @@ class GPT(nn.Module):
 
         return model
 
+# ---
+# Environment Setup
+def get_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.mps.is_available():
+        return "mps"
+    return "cpu"
+
+def set_seed(s:int):
+    torch.manual_seed(s)
+    torch.cuda.manual_seed(s)
+
+device = get_device()
+print(f"Using device: {device}")
+set_seed(42)
+
+### Tokenizer Setup
+import tiktoken
+tokenizer = tiktoken.get_encoding("gpt2")
+tokens = tokenizer.encode("Hello, I'm a language model,")
+
+### Generate Text Loop
+max_output_length = 30
+num_return_sequences = 5
+tokens = torch.tensor(tokens, dtype=torch.long) # [4]
+tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1) # [5,4]
+x = tokens.to(device)
+
+# Load model
+model = GPT.from_pretrained("gpt2")
+model.to(device)
+# model = GPT(Config()).to(device)
+model.eval()
+
+# Run inference.
+with torch.no_grad():
+  while x.size(1) < max_output_length:
+    logits = model(x)
+    logits = logits[:, -1, :]
+    probs = F.softmax(logits, dim=-1)
+    x_next = torch.multinomial(probs, num_samples=1)
+    x = torch.cat([x, x_next], dim=1)
+
+for row in x.tolist():
+    print(tokenizer.decode(row))
