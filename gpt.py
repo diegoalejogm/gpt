@@ -39,11 +39,18 @@ class CausalSelfAttention(nn.Module):
         qkv = self.c_attn(x) # [B, T, 3E]
         Q, K, V = qkv.split(self.n_embd, dim=-1) # [B, T, E] each
 
+        Q = Q.view(B, T, self.n_head, E // self.n_head) # [B,T,nh,E']
+        Q = Q.transpose(1,2) # [B,nh, T, E']
+        K = K.view(B, T, self.n_head, E // self.n_head) # [B,T,nh,E']
+        K = K.transpose(1,2) # [B,nh, T, E']
+        V = V.view(B, T, self.n_head, E // self.n_head) # [B,T,nh,E']
+        V = V.transpose(1,2) # [B,nh, T, E']
+
         A = (Q @ K.transpose(-2, -1)) * (1 / math.sqrt(K.size(-1)))
         A = A.masked_fill(self.bias[:, :T, :T] == 0, float('-inf'))
         A = F.softmax(A, dim=-1) # [B, nh, T, T]
 
-        y = A @ V # [B, nh, T, e]
+        y = A @ V # [B, nh, T, E']
         y = y.transpose(1,2).contiguous().view(B,T,E) # [B, T, E]
         y = self.c_proj(y)
         return y
@@ -85,11 +92,25 @@ class GPT(nn.Module):
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.n_embd),
             wpe = nn.Embedding(config.block_size, config.n_embd),
-                h  = nn.ModuleList([TransformerBlock(config) for _ in range(config.n_layer)],
+            h  = nn.ModuleList([TransformerBlock(config) for _ in range(config.n_layer)],
             ),
             ln_f = nn.LayerNorm(config.n_embd),
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+    def forward(self, x):
+        B, T = x.size()
+        assert T <= self.config.block_size
+
+        pos = torch.arange(0, T, dtype=torch.long, device=x.device)
+
+        x = self.transformer.wte(x) + self.transformer.wpe(pos)
+        for block in self.transformer.h:
+            x = block(x)
+        x = self.transformer.ln_f(x)
+        x = self.lm_head(x)
+
+        return x
 
     @classmethod
     def from_pretrained(cls, model_type):
@@ -140,19 +161,3 @@ class GPT(nn.Module):
 
         return model
 
-# ---
-def test_loading_works():
-    GPT.from_pretrained("gpt2")
-    print('Successs !')
-
-def test_attention_runs():
-    mock_tensor = torch.randn([4, Config().block_size, Config().n_embd])
-    print(CausalSelfAttention(Config())(mock_tensor).shape)
-    print('Success !')
-# ---
-### Tests for the GPT model
-print("test_loading_works")
-test_loading_works()
-print("test_attention_runs")
-test_attention_runs()
-print("All tests passed")
