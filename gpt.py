@@ -150,3 +150,9 @@ def test_attention_runs():
     print(CausalSelfAttention(Config())(mock_tensor).shape)
     print('Success !')
 # ---
+### Tests for the GPT model
+print("test_loading_works")
+test_loading_works()
+print("test_attention_runs")
+test_attention_runs()
+print("All tests passed")
