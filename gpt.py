@@ -25,6 +25,7 @@ class CausalSelfAttention(nn.Module):
 
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
+        self.c_proj.GPT2_SCALE_INIT = 1
 
         self.register_buffer(
             "bias",
@@ -65,6 +66,7 @@ class MLP(nn.Module):
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd)
         self.gelu = nn.GELU(approximate="tanh")
         self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
+        self.c_proj.GPT2_SCALE_INIT = 1
 
     def forward(self, x):
         x = self.c_fc(x)
@@ -107,6 +109,22 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
         self.transformer.wte.weight = self.lm_head.weight
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        # Init weights std=0.02 and bias=0.
+        # Divide std by sqrt(n_layers) to account for residual stream variance.
+        # No need to update layer norm. Defaults are offset=0 and scale=1.
+        if isinstance(module, nn.Linear):
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+            std = 0.02
+            if hasattr(module, "GPT2_SCALE_INIT"):
+                std *= (2 * self.config.n_layer) ** -0.5
+            torch.nn.init.normal_(module.weight, mean=0.0, std=std)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, x, targets=None):
         B, T = x.size()
