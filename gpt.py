@@ -106,7 +106,7 @@ class GPT(nn.Module):
         )
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         B, T = x.size()
         assert T <= self.config.block_size
 
@@ -116,9 +116,12 @@ class GPT(nn.Module):
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.ln_f(x)
-        x = self.lm_head(x)
+        logits = self.lm_head(x)
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
 
-        return x
+        return logits, loss
 
     @classmethod
     def from_pretrained(cls, model_type):
@@ -203,6 +206,9 @@ device = get_device()
 print(f"Using device: {device}")
 set_seed(42)
 
+################
+# INFERENCE
+################
 ### Tokenizer Setup
 import tiktoken
 
@@ -225,7 +231,7 @@ model.eval()
 # Run inference.
 with torch.no_grad():
     while x.size(1) < max_output_length:
-        logits = model(x)
+        logits, loss = model(x)
         logits = logits[:, -1, :]
         probs = F.softmax(logits, dim=-1)
         x_next = torch.multinomial(probs, num_samples=1)
@@ -233,3 +239,35 @@ with torch.no_grad():
 
 for row in x.tolist():
     print(tokenizer.decode(row))
+
+################
+# TRAINING
+################
+
+# Environment
+B, T = 4, 32  # Batch size, window.
+
+# Load dataset.
+with open("tinyshakespeare.txt", "r") as f:
+    text = f.read()
+text = text[:1000]
+
+# Convert into inputs & targets
+enc = tiktoken.get_encoding("gpt2")
+tokens = enc.encode(text)
+buffer = torch.tensor(tokens[: B * T + 1], device=device)
+x = buffer[:-1].view(B, T)
+y = buffer[1:].view(B, T)
+
+# Load model.
+
+model = GPT(Config())
+model.to(device)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
+for i in range(50):
+    optimizer.zero_grad()
+    logits, loss = model(x, y)
+    loss.backward()
+    optimizer.step()
+    print(f"Step {i}, loss {loss.item()}")
