@@ -106,6 +106,8 @@ class GPT(nn.Module):
         )
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
+        self.transformer.wte.weight = self.lm_head.weight
+
     def forward(self, x, targets=None):
         B, T = x.size()
         assert T <= self.config.block_size
