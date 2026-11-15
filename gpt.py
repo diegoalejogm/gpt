@@ -254,6 +254,7 @@ def get_device():
 def set_seed(s: int):
     torch.manual_seed(s)
     torch.cuda.manual_seed(s)
+    torch.mps.manual_seed(s)
 
 
 device = get_device()
