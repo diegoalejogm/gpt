@@ -1,6 +1,6 @@
 ## Macbook Runs
 
-Baseline
+### Batch Size and dType
 
 | dType | Batch Size | T    | DT (msec)   | Tokens / Sec |
 | ----- | ---------- | ---- | ----------- | ------------ |
@@ -24,3 +24,18 @@ Second row:
 
 - Too few tokens per sec and takes too long. Looks like it bottlenecks at 8 batch size, maybe due to HBM utilization.
 
+# Compile
+
+| Compile | dType    | Batch Size | T        | DT (msec) | Tokens / Sec |
+| ------- | -------- | ---------- | -------- | --------- | ------------ |
+| False   | **BF16** | 4          | 1024     | 950       | 4320         |
+| True    | **BF16** | **4**      | **1024** | 750       | **5480**     |
+
+## Flash Attention
+
+| Flash Attention | Compile | dType      | Batch Size | T   | DT (msec) | Tokens / Sec |
+| --------------- | ------- | ---------- | --------   | --- |     ---   | ------------ |
+| False           | True    | BF16       | 4   | 1024      | 750|5480         |
+| True            | True    | BF16       | 4   | 1024      |770 | 5340         |
+
+Interestingly, flash attention runs slower.
