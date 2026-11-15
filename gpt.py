@@ -280,7 +280,7 @@ def run_inference():
 
     # Load model
     # model = GPT.from_pretrained("gpt2")
-    model = GPT(Config()).to(device)
+    model = GPT(Config(vocab_size=50304)).to(device)
     model.to(device)
     model.eval()
 

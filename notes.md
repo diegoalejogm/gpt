@@ -35,7 +35,16 @@ Second row:
 
 | Flash Attention | Compile | dType      | Batch Size | T   | DT (msec) | Tokens / Sec |
 | --------------- | ------- | ---------- | --------   | --- |     ---   | ------------ |
-| False           | True    | BF16       | 4   | 1024      | 750|5480         |
+| False           | True    | BF16       | 4   | 1024      | 750|5460         |
 | True            | True    | BF16       | 4   | 1024      |770 | 5340         |
 
-Interestingly, flash attention runs slower.
+Surprisingly, flash attention runs slower.
+
+## Pretty numbers (vocab. size 53012)
+
+| Vocab Size | Flash Attention | Compile | dType | Batch Size | T    | DT (msec) | Tokens / Sec |
+| ---------- | --------------- | ------- | ----- | ---------- | ---- | --------- | ------------ |
+| 50257      | False           | True    | BF16  | 4          | 1024 | 750       | 5460         |
+| 53012      | True            | True    | BF16  | 4          | 1024 | 750       | 5460         |
+
+Increasing vocab size to a number that's multiple of 2,4,8,16 enables better use of matrix kernels.
