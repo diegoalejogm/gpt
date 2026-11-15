@@ -53,8 +53,10 @@ class CausalSelfAttention(nn.Module):
         A = (Q @ K.transpose(-2, -1)) * (1 / math.sqrt(K.size(-1)))
         A = A.masked_fill(self.bias[:, :T, :T] == 0, float("-inf"))
         A = F.softmax(A, dim=-1)  # [B, nh, T, T]
-
         y = A @ V  # [B, nh, T, E']
+
+        # y = F.scaled_dot_product_attention(Q, K, V, is_causal=True)
+
         y = y.transpose(1, 2).contiguous().view(B, T, E)  # [B, T, E]
         y = self.c_proj(y)
         return y
@@ -318,6 +320,7 @@ dataloader = DataLoader(B=4, T=1024)
 # Load model.
 model = GPT(Config())
 model.to(device)
+model = torch.compile(model)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 for i in range(50):
