@@ -312,7 +312,8 @@ def synchronize(device):
 
 
 # Load dataloader.
-dataloader = DataLoader(B=2, T=1024)
+dataloader = DataLoader(B=4, T=1024)
+# torch.set_float32_matmul_precision("high")
 
 # Load model.
 model = GPT(Config())
@@ -324,7 +325,8 @@ for i in range(50):
     optimizer.zero_grad()
     x, y = dataloader.next_batch()
     x, y = x.to(device), y.to(device)
-    logits, loss = model(x, y)
+    with torch.autocast(device_type=device, dtype=torch.bfloat16):
+        logits, loss = model(x, y)
     loss.backward()
     optimizer.step()
     synchronize(device)
