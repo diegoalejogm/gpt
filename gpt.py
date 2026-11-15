@@ -187,6 +187,40 @@ class GPT(nn.Module):
         return model
 
 
+import tiktoken
+
+
+class DataLoader:
+    def __init__(self, B, T) -> None:
+        self.B, self.T = B, T
+        with open("tinyshakespeare.txt", "r") as f:
+            text = f.read()
+        enc = tiktoken.get_encoding("gpt2")
+        tokens = enc.encode(text)
+        self.tokens = torch.tensor(tokens)
+
+        print(f"Loaded {len(tokens)} tokens")
+        print(f"1 epoch = {len(tokens)// (B*T)} batches")
+        self.current_pos = 0
+
+    def next_batch(self):
+        B, T = self.B, self.T
+        buffer = torch.tensor(
+            self.tokens.detach().clone()[
+                self.current_pos : self.current_pos + (B * T) + 1
+            ],
+        )
+        x = buffer[:-1].view(B, T)
+        y = buffer[1:].view(B, T)
+        self.current_pos += B * T
+
+        # Reset current_pos when it overflows.
+        if self.current_pos + (B * T + 1) >= len(self.tokens):
+            self.current_pos = 0
+
+        return x, y
+
+
 # ---
 # Environment Setup
 def get_device():
@@ -247,17 +281,8 @@ for row in x.tolist():
 # Environment
 B, T = 4, 32  # Batch size, window.
 
-# Load dataset.
-with open("tinyshakespeare.txt", "r") as f:
-    text = f.read()
-text = text[:1000]
-
-# Convert into inputs & targets
-enc = tiktoken.get_encoding("gpt2")
-tokens = enc.encode(text)
-buffer = torch.tensor(tokens[: B * T + 1], device=device)
-x = buffer[:-1].view(B, T)
-y = buffer[1:].view(B, T)
+# Load dataloader.
+dataloader = DataLoader(B, T)
 
 # Load model.
 
@@ -267,6 +292,8 @@ model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 for i in range(50):
     optimizer.zero_grad()
+    x, y = dataloader.next_batch()
+    x, y = x.to(device), y.to(device)
     logits, loss = model(x, y)
     loss.backward()
     optimizer.step()
