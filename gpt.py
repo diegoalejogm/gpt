@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from torch import nn
 import math
+import time
 import torch
 import torch.nn.functional as F
 
@@ -225,11 +226,7 @@ class DataLoader:
 
     def next_batch(self):
         B, T = self.B, self.T
-        buffer = torch.tensor(
-            self.tokens.detach().clone()[
-                self.current_pos : self.current_pos + (B * T) + 1
-            ],
-        )
+        buffer = self.tokens[self.current_pos : self.current_pos + (B * T) + 1]
         x = buffer[:-1].view(B, T)
         y = buffer[1:].view(B, T)
         self.current_pos += B * T
@@ -259,63 +256,79 @@ def set_seed(s: int):
 
 device = get_device()
 print(f"Using device: {device}")
-set_seed(42)
 
-################
-# INFERENCE
-################
-### Tokenizer Setup
-import tiktoken
 
-tokenizer = tiktoken.get_encoding("gpt2")
-tokens = tokenizer.encode("Hello, I'm a language model,")
+# ################
+# # INFERENCE
+# ################
+def run_inference():
+    set_seed(42)
+    ### Tokenizer Setup
+    import tiktoken
 
-### Generate Text Loop
-max_output_length = 30
-num_return_sequences = 5
-tokens = torch.tensor(tokens, dtype=torch.long)  # [4]
-tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1)  # [5,4]
-x = tokens.to(device)
+    tokenizer = tiktoken.get_encoding("gpt2")
+    tokens = tokenizer.encode("Hello, I'm a language model,")
 
-# Load model
-# model = GPT.from_pretrained("gpt2")
-model = GPT(Config()).to(device)
-model.to(device)
-model.eval()
+    ### Generate Text Loop
+    max_output_length = 30
+    num_return_sequences = 5
+    tokens = torch.tensor(tokens, dtype=torch.long)  # [4]
+    tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1)  # [5,4]
+    x = tokens.to(device)
 
-# Run inference.
-with torch.no_grad():
-    while x.size(1) < max_output_length:
-        logits, loss = model(x)
-        logits = logits[:, -1, :]
-        probs = F.softmax(logits, dim=-1)
-        x_next = torch.multinomial(probs, num_samples=1)
-        x = torch.cat([x, x_next], dim=1)
+    # Load model
+    # model = GPT.from_pretrained("gpt2")
+    model = GPT(Config()).to(device)
+    model.to(device)
+    model.eval()
 
-for row in x.tolist():
-    print(tokenizer.decode(row))
+    # Run inference.
+    with torch.no_grad():
+        while x.size(1) < max_output_length:
+            logits, loss = model(x)
+            logits = logits[:, -1, :]
+            probs = F.softmax(logits, dim=-1)
+            x_next = torch.multinomial(probs, num_samples=1)
+            x = torch.cat([x, x_next], dim=1)
+
+    for row in x.tolist():
+        print(tokenizer.decode(row))
+
+
+# run_inference()
 
 ################
 # TRAINING
 ################
 
-# Environment
-B, T = 4, 32  # Batch size, window.
+
+def synchronize(device):
+    if device == "mps":
+        torch.mps.synchronize()
+    elif device == "cuda":
+        torch.cuda.synchronize()
+    elif device == "cpu":
+        torch.cpu.synchronize()
+
 
 # Load dataloader.
-dataloader = DataLoader(B, T)
+dataloader = DataLoader(B=2, T=1024)
 
 # Load model.
-
 model = GPT(Config())
 model.to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 for i in range(50):
+    t0 = time.time()
     optimizer.zero_grad()
     x, y = dataloader.next_batch()
     x, y = x.to(device), y.to(device)
     logits, loss = model(x, y)
     loss.backward()
     optimizer.step()
-    print(f"Step {i}, loss {loss.item()}")
+    synchronize(device)
+    t1 = time.time()
+    dt = (t1 - t0) * 1000
+    tokens_per_sec = dataloader.B * dataloader.T / (t1 - t0)
+    print(f"Step {i}, loss {loss.item()}, dt: {dt} ms, tok.sec: {tokens_per_sec}")
