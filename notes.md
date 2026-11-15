@@ -41,7 +41,7 @@ Second row:
 
 Surprisingly, flash attention runs slower with same batch size, but it enables us to run with batch size 16, with small  gains for token/sec.
 
-## Pretty numbers (vocab. size 53012)
+## Pretty numbers (vocab. size 50304)
 
 | Vocab Size | Flash Attention | Compile | dType | Batch Size | T    | DT (msec) | Tokens / Sec |
 | ---------- | --------------- | ------- | ----- | ---------- | ---- | --------- | ------------ |
