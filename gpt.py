@@ -315,10 +315,10 @@ def synchronize(device):
 
 # Load dataloader.
 dataloader = DataLoader(B=32, T=1024)
-# torch.set_float32_matmul_precision("high")
+torch.set_float32_matmul_precision("high")
 
 # Load model.
-model = GPT(Config())
+model = GPT(Config(vocab_size=50304))
 model.to(device)
 model = torch.compile(model)
 
