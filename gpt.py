@@ -305,8 +305,7 @@ def run_inference():
 
     # Load model
     # model = GPT.from_pretrained("gpt2")
-    model = GPT(Config(vocab_size=50304)).to(device)
-    model.to(device)
+    model = GPT(Config(vocab_size=50_304)).to(device)
     model.eval()
 
     # Run inference.
@@ -343,11 +342,11 @@ dataloader = DataLoader(B=32, T=1024)
 torch.set_float32_matmul_precision("high")
 
 # Load model.
-model = GPT(Config(vocab_size=50304))
+model = GPT(Config(vocab_size=50_304))
 model.to(device)
 model = torch.compile(model)
 
-# optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)#, betas=[0.9, 0.95], eps=1e-8)
+# optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)#, betas=[0.9, 0.95], eps=1e-8)
 learning_rate = 6e-4
 optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=learning_rate, device=device)
 
