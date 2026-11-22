@@ -371,7 +371,7 @@ def get_lr(it, max_steps, max_lr):
     # Warmup.
     if it < warmup_steps: return max_lr * (it+1) / warmup_steps
     # Min LR.
-    if it > num_steps: return min_lr
+    if it > max_steps: return min_lr
     # Cosine.
     decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
     assert 0 <= decay_ratio <= 1
