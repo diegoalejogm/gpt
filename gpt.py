@@ -338,7 +338,15 @@ def synchronize(device):
 
 
 # Load dataloader.
-dataloader = DataLoader(B=32, T=1024)
+total_batch_size = 524_288 # Approx 0.5M tokens.
+B = 32 # micro batch size.
+T = 1024 # sequence length.
+assert total_batch_size % (B*T) == 0
+grad_accum_steps = total_batch_size // (B*T)
+print(f"Total batch size: {total_batch_size}")
+print(f"Gradient accum. steps: {grad_accum_steps}")
+
+dataloader = DataLoader(B=B, T=T)
 torch.set_float32_matmul_precision("high")
 
 # Load model.
@@ -353,7 +361,6 @@ optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=learning_
 num_steps = 10
 sum_tokens_per_sec = 0
 sum_dt = 0
-
 
 def get_lr(it, max_steps, max_lr):
     """ Cosine with warmup."""
@@ -374,20 +381,24 @@ def get_lr(it, max_steps, max_lr):
 for step in range(num_steps):
     t0 = time.time()
     optimizer.zero_grad()
-    x, y = dataloader.next_batch()
-    x, y = x.to(device), y.to(device)
-    with torch.autocast(device_type=device, dtype=torch.bfloat16):
-        logits, loss = model(x, y)
-    loss.backward()
+    for _ in range(grad_accum_steps):
+        x, y = dataloader.next_batch()
+        x, y = x.to(device), y.to(device)
+        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+            logits, loss = model(x, y)
+        loss /= grad_accum_steps
+        loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     lr = get_lr(step, num_steps, learning_rate)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
     optimizer.step()
+
+    # Logging.
     synchronize(device)
     t1 = time.time()
     dt = (t1 - t0) * 1000
-    tokens_per_sec = dataloader.B * dataloader.T / (t1 - t0)
+    tokens_per_sec = grad_accum_steps * dataloader.B * dataloader.T / (t1 - t0)
     print(f"Step {step}, loss {loss.item()}, lr: {lr:.4e} norm: {norm:.4f} dt: {dt:.2f} ms, tok.sec: {tokens_per_sec:.2f}")
 
     if step == 0 : continue
