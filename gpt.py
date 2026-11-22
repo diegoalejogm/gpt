@@ -323,7 +323,10 @@ model.to(device)
 model = torch.compile(model)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
-for i in range(50):
+num_steps = 50
+sum_tokens_per_sec = 0
+sum_dt = 0
+for i in range(num_steps):
     t0 = time.time()
     optimizer.zero_grad()
     x, y = dataloader.next_batch()
@@ -337,3 +340,8 @@ for i in range(50):
     dt = (t1 - t0) * 1000
     tokens_per_sec = dataloader.B * dataloader.T / (t1 - t0)
     print(f"Step {i}, loss {loss.item()}, dt: {dt} ms, tok.sec: {tokens_per_sec}")
+
+    if i == 0 : continue
+    sum_dt += dt
+    sum_tokens_per_sec += tokens_per_sec
+print(f"avg_dt: {sum_dt/(num_steps-1)} ms, tok.sec: {sum_tokens_per_sec/(num_steps-1)}")
