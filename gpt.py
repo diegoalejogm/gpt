@@ -379,12 +379,14 @@ def get_lr(it, max_steps, max_lr):
 for step in range(num_steps):
     t0 = time.time()
     optimizer.zero_grad()
+    loss_accum = 0
     for _ in range(grad_accum_steps):
         x, y = dataloader.next_batch()
         x, y = x.to(device), y.to(device)
         with torch.autocast(device_type=device, dtype=torch.bfloat16):
             logits, loss = model(x, y)
         loss /= grad_accum_steps
+        loss_accum += loss.detach()
         loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     lr = get_lr(step, num_steps, learning_rate)
@@ -397,7 +399,7 @@ for step in range(num_steps):
     t1 = time.time()
     dt = (t1 - t0) * 1000
     tokens_per_sec = grad_accum_steps * dataloader.B * dataloader.T / (t1 - t0)
-    print(f"Step {step}, loss {loss.item()}, lr: {lr:.4e} norm: {norm:.4f} dt: {dt:.2f} ms, tok.sec: {tokens_per_sec:.2f}")
+    print(f"Step {step}, loss {loss_accum.item():.6f}, lr: {lr:.4e} norm: {norm:.4f} dt: {dt:.2f} ms, tok.sec: {tokens_per_sec:.2f}")
 
     if step == 0 : continue
     sum_dt += dt
