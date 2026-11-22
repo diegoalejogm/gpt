@@ -50,12 +50,12 @@ class CausalSelfAttention(nn.Module):
         V = V.view(B, T, self.n_head, E // self.n_head)  # [B,T,nh,E']
         V = V.transpose(1, 2)  # [B,nh, T, E']
 
-        A = (Q @ K.transpose(-2, -1)) * (1 / math.sqrt(K.size(-1)))
-        A = A.masked_fill(self.bias[:, :T, :T] == 0, float("-inf"))
-        A = F.softmax(A, dim=-1)  # [B, nh, T, T]
-        y = A @ V  # [B, nh, T, E']
+        # A = (Q @ K.transpose(-2, -1)) * (1 / math.sqrt(K.size(-1)))
+        # A = A.masked_fill(self.bias[:, :T, :T] == 0, float("-inf"))
+        # A = F.softmax(A, dim=-1)  # [B, nh, T, T]
+        # y = A @ V  # [B, nh, T, E']
 
-        # y = F.scaled_dot_product_attention(Q, K, V, is_causal=True)
+        y = F.scaled_dot_product_attention(Q, K, V, is_causal=True)
 
         y = y.transpose(1, 2).contiguous().view(B, T, E)  # [B, T, E]
         y = self.c_proj(y)
@@ -314,7 +314,7 @@ def synchronize(device):
 
 
 # Load dataloader.
-dataloader = DataLoader(B=4, T=1024)
+dataloader = DataLoader(B=32, T=1024)
 # torch.set_float32_matmul_precision("high")
 
 # Load model.

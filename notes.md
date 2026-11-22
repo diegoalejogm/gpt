@@ -62,3 +62,10 @@ Increasing vocab size to a number that's multiple of 128 should enable better us
 | 50304      | False           | True    | BF16  | 64          | 1024 | ERR        | ERR  |
 
 Batch Size 64 is too big for the TPU memory. It requires > 78GB HBM and A100 have 80GB max capacity (79.5GB).
+
+
+## Flash Attention
+| Vocab Size | Flash Attention | Compile | dType | Batch Size  | T    | DT (msec) | Tokens / Sec |
+| ---------- | --------------- | ------- | ----- | ----------  | ---- | --------- | ------------ |
+| 50304      | False           | True    | BF16  | 32          | 1024 | 352.8        | 92892  |
+| 50304      | True            | True    | BF16  | 32          | 1024 | 280.4        | 116856.3  |
