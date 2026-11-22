@@ -333,8 +333,6 @@ def synchronize(device):
         torch.mps.synchronize()
     elif device == "cuda":
         torch.cuda.synchronize()
-    elif device == "cpu":
-        torch.cpu.synchronize()
 
 
 # Load dataloader.
